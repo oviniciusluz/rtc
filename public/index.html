@@ -430,6 +430,11 @@
         
         <div id="usersOnline" class="users-online">
             Usuários online: <span id="userCount">0</span>
+            <div style="margin-top: 10px;">
+                <button onclick="testWebRTCConnectivity()" style="background: #17a2b8; color: white; border: none; padding: 5px 10px; border-radius: 15px; cursor: pointer; font-size: 0.8em; margin-right: 10px;">
+                    🧪 Testar WebRTC
+                </button>
+            </div>
             <div id="usersList" style="margin-top: 10px; max-height: 150px; overflow-y: auto;">
                 <!-- Lista de usuários será inserida aqui -->
             </div>
@@ -501,12 +506,38 @@
         let isVideoEnabled = true;
         let isAudioEnabled = true;
         
-        // Configuração STUN/TURN servers
+        // Configuração STUN/TURN servers melhorada
         const rtcConfiguration = {
             iceServers: [
+                // Servidores STUN do Google
                 { urls: 'stun:stun.l.google.com:19302' },
-                { urls: 'stun:stun1.l.google.com:19302' }
-            ]
+                { urls: 'stun:stun1.l.google.com:19302' },
+                { urls: 'stun:stun2.l.google.com:19302' },
+                { urls: 'stun:stun3.l.google.com:19302' },
+                { urls: 'stun:stun4.l.google.com:19302' },
+                // Servidores STUN alternativos
+                { urls: 'stun:stun.ekiga.net' },
+                { urls: 'stun:stun.ideasip.com' },
+                { urls: 'stun:stun.schlund.de' },
+                { urls: 'stun:stun.stunprotocol.org:3478' },
+                { urls: 'stun:stun.voiparound.com' },
+                { urls: 'stun:stun.voipbuster.com' },
+                { urls: 'stun:stun.voipstunt.com' },
+                { urls: 'stun:stun.counterpath.com' },
+                { urls: 'stun:stun.1und1.de' },
+                // Servidores TURN públicos (limitados, mas funcionam)
+                {
+                    urls: 'turn:openrelay.metered.ca:80',
+                    username: 'openrelayproject',
+                    credential: 'openrelayproject'
+                },
+                {
+                    urls: 'turn:openrelay.metered.ca:443',
+                    username: 'openrelayproject',
+                    credential: 'openrelayproject'
+                }
+            ],
+            iceCandidatePoolSize: 10
         };
 
         // Conectar ao servidor Socket.IO
@@ -568,33 +599,46 @@
 
         socket.on('webrtc_offer', async (data) => {
             try {
+                console.log('📥 Recebendo offer de:', data.from);
                 await peerConnection.setRemoteDescription(new RTCSessionDescription(data.offer));
+                console.log('✅ Remote description definida');
+                
                 const answer = await peerConnection.createAnswer();
+                console.log('📤 Criando answer...');
                 await peerConnection.setLocalDescription(answer);
+                console.log('✅ Local description definida');
                 
                 socket.emit('webrtc_answer', {
                     answer: answer,
                     targetSocketId: data.fromSocketId,
                     callId: data.callId
                 });
+                console.log('📤 Answer enviada para:', data.from);
             } catch (error) {
-                console.error('Erro ao processar offer:', error);
+                console.error('❌ Erro ao processar offer:', error);
+                showError('Erro ao processar oferta de chamada: ' + error.message);
             }
         });
 
         socket.on('webrtc_answer', async (data) => {
             try {
+                console.log('📥 Recebendo answer de:', data.from);
                 await peerConnection.setRemoteDescription(new RTCSessionDescription(data.answer));
+                console.log('✅ Answer processada com sucesso');
             } catch (error) {
-                console.error('Erro ao processar answer:', error);
+                console.error('❌ Erro ao processar answer:', error);
+                showError('Erro ao processar resposta de chamada: ' + error.message);
             }
         });
 
         socket.on('webrtc_ice_candidate', async (data) => {
             try {
+                console.log('🧊 Recebendo ICE candidate de:', data.from);
                 await peerConnection.addIceCandidate(new RTCIceCandidate(data.candidate));
+                console.log('✅ ICE candidate adicionado');
             } catch (error) {
-                console.error('Erro ao adicionar ICE candidate:', error);
+                console.error('❌ Erro ao adicionar ICE candidate:', error);
+                showError('Erro ao processar candidato ICE: ' + error.message);
             }
         });
 
@@ -847,38 +891,81 @@
         function setupPeerConnectionEvents() {
             // Evento quando recebe stream remoto
             peerConnection.ontrack = (event) => {
+                console.log('🎥 Stream remoto recebido:', event);
                 remoteStream = event.streams[0];
                 document.getElementById('remoteVideo').srcObject = remoteStream;
+                showError('✅ Conexão de vídeo estabelecida!');
             };
 
             // Evento para ICE candidates
             peerConnection.onicecandidate = (event) => {
                 if (event.candidate) {
+                    console.log('🧊 ICE candidate local:', event.candidate);
                     socket.emit('webrtc_ice_candidate', {
                         candidate: event.candidate,
                         targetSocketId: currentCallData ? currentCallData.fromSocketId : null,
                         callId: currentCallId
                     });
+                } else {
+                    console.log('🧊 ICE gathering completo');
                 }
             };
 
             // Evento quando conexão muda de estado
             peerConnection.onconnectionstatechange = () => {
-                console.log('Estado da conexão:', peerConnection.connectionState);
-                if (peerConnection.connectionState === 'failed') {
-                    showError('Conexão falhou');
-                    endVideoCall();
+                console.log('🔗 Estado da conexão:', peerConnection.connectionState);
+                switch (peerConnection.connectionState) {
+                    case 'connected':
+                        showError('✅ Conexão WebRTC estabelecida!');
+                        break;
+                    case 'disconnected':
+                        showError('⚠️ Conexão WebRTC perdida');
+                        break;
+                    case 'failed':
+                        showError('❌ Conexão WebRTC falhou - tentando reconectar...');
+                        // Tentar reconectar
+                        setTimeout(() => {
+                            if (peerConnection.connectionState === 'failed') {
+                                endVideoCall();
+                            }
+                        }, 3000);
+                        break;
+                    case 'closed':
+                        console.log('🔒 Conexão WebRTC fechada');
+                        break;
                 }
+            };
+
+            // Evento para ICE connection state
+            peerConnection.oniceconnectionstatechange = () => {
+                console.log('🧊 ICE connection state:', peerConnection.iceConnectionState);
+                if (peerConnection.iceConnectionState === 'failed') {
+                    console.log('🧊 ICE connection failed, tentando restart...');
+                    peerConnection.restartIce();
+                }
+            };
+
+            // Evento para ICE gathering state
+            peerConnection.onicegatheringstatechange = () => {
+                console.log('🧊 ICE gathering state:', peerConnection.iceGatheringState);
             };
         }
 
         async function startVideoCall() {
             try {
+                console.log('🎬 Iniciando processo de chamada...');
+                console.log('📊 Configuração WebRTC:', rtcConfiguration);
+                
                 // Criar offer
+                console.log('📤 Criando offer...');
                 const offer = await peerConnection.createOffer();
+                console.log('✅ Offer criado:', offer);
+                
                 await peerConnection.setLocalDescription(offer);
+                console.log('✅ Local description definida');
 
                 // Enviar offer
+                console.log('📤 Enviando offer para:', currentCallData.fromSocketId);
                 socket.emit('webrtc_offer', {
                     offer: offer,
                     targetSocketId: currentCallData.fromSocketId,
@@ -886,7 +973,38 @@
                 });
 
             } catch (error) {
-                console.error('Erro ao criar offer:', error);
+                console.error('❌ Erro ao criar offer:', error);
+                showError('Erro ao iniciar chamada: ' + error.message);
+            }
+        }
+
+        // Função para testar conectividade WebRTC
+        async function testWebRTCConnectivity() {
+            try {
+                console.log('🧪 Testando conectividade WebRTC...');
+                
+                // Criar peer connection de teste
+                const testPC = new RTCPeerConnection(rtcConfiguration);
+                
+                // Adicionar evento de ICE candidate
+                testPC.onicecandidate = (event) => {
+                    if (event.candidate) {
+                        console.log('🧊 ICE candidate de teste:', event.candidate);
+                    } else {
+                        console.log('🧊 ICE gathering de teste completo');
+                    }
+                };
+                
+                // Criar offer de teste
+                const testOffer = await testPC.createOffer();
+                await testPC.setLocalDescription(testOffer);
+                
+                console.log('✅ Teste de conectividade WebRTC bem-sucedido');
+                testPC.close();
+                
+            } catch (error) {
+                console.error('❌ Teste de conectividade WebRTC falhou:', error);
+                showError('Problema de conectividade WebRTC: ' + error.message);
             }
         }
 

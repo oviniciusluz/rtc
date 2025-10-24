@@ -138,12 +138,15 @@ io.on('connection', (socket) => {
     const targetSocket = io.sockets.sockets.get(data.targetSocketId);
     
     if (targetSocket) {
+      console.log(`📤 Enviando offer de ${socket.username} para ${targetSocket.username}`);
       targetSocket.emit('webrtc_offer', {
         offer: data.offer,
         from: socket.username || 'Usuário Anônimo',
         fromSocketId: socket.id,
         callId: data.callId
       });
+    } else {
+      console.log(`❌ Socket ${data.targetSocketId} não encontrado para offer`);
     }
   });
 
@@ -151,11 +154,14 @@ io.on('connection', (socket) => {
     const targetSocket = io.sockets.sockets.get(data.targetSocketId);
     
     if (targetSocket) {
+      console.log(`📤 Enviando answer de ${socket.username} para ${targetSocket.username}`);
       targetSocket.emit('webrtc_answer', {
         answer: data.answer,
         from: socket.username || 'Usuário Anônimo',
         callId: data.callId
       });
+    } else {
+      console.log(`❌ Socket ${data.targetSocketId} não encontrado para answer`);
     }
   });
 
@@ -163,11 +169,14 @@ io.on('connection', (socket) => {
     const targetSocket = io.sockets.sockets.get(data.targetSocketId);
     
     if (targetSocket) {
+      console.log(`🧊 Enviando ICE candidate de ${socket.username} para ${targetSocket.username}`);
       targetSocket.emit('webrtc_ice_candidate', {
         candidate: data.candidate,
         from: socket.username || 'Usuário Anônimo',
         callId: data.callId
       });
+    } else {
+      console.log(`❌ Socket ${data.targetSocketId} não encontrado para ICE candidate`);
     }
   });
 
