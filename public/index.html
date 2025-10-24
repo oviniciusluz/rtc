@@ -1,0 +1,973 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Chat com Socket.IO</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            height: 100vh;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+        }
+
+        .chat-container {
+            width: 90%;
+            max-width: 800px;
+            height: 80vh;
+            background: white;
+            border-radius: 20px;
+            box-shadow: 0 20px 40px rgba(0,0,0,0.1);
+            display: flex;
+            flex-direction: column;
+            overflow: hidden;
+        }
+
+        .chat-header {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            padding: 20px;
+            text-align: center;
+            font-size: 1.5em;
+            font-weight: bold;
+        }
+
+        .users-online {
+            background: #f8f9fa;
+            padding: 10px 20px;
+            border-bottom: 1px solid #e9ecef;
+            font-size: 0.9em;
+            color: #6c757d;
+        }
+
+        .users-online span {
+            background: #28a745;
+            color: white;
+            padding: 2px 8px;
+            border-radius: 12px;
+            margin-right: 5px;
+            font-size: 0.8em;
+        }
+
+        .messages-container {
+            flex: 1;
+            padding: 20px;
+            overflow-y: auto;
+            background: #f8f9fa;
+        }
+
+        .message {
+            margin-bottom: 15px;
+            padding: 12px 16px;
+            border-radius: 18px;
+            max-width: 70%;
+            word-wrap: break-word;
+            position: relative;
+        }
+
+        .message.own {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            margin-left: auto;
+            text-align: right;
+        }
+
+        .message.other {
+            background: white;
+            color: #333;
+            border: 1px solid #e9ecef;
+        }
+
+        .message.system {
+            background: #fff3cd;
+            color: #856404;
+            text-align: center;
+            margin: 10px auto;
+            max-width: 90%;
+            border: 1px solid #ffeaa7;
+        }
+
+        .message.private {
+            background: #d1ecf1;
+            color: #0c5460;
+            border: 1px solid #bee5eb;
+        }
+
+        .message-header {
+            font-size: 0.8em;
+            opacity: 0.8;
+            margin-bottom: 5px;
+        }
+
+        .message-content {
+            font-size: 1em;
+            line-height: 1.4;
+        }
+
+        .message-time {
+            font-size: 0.7em;
+            opacity: 0.6;
+            margin-top: 5px;
+        }
+
+        .typing-indicator {
+            padding: 10px 20px;
+            font-style: italic;
+            color: #6c757d;
+            font-size: 0.9em;
+        }
+
+        .input-container {
+            padding: 20px;
+            background: white;
+            border-top: 1px solid #e9ecef;
+            display: flex;
+            gap: 10px;
+        }
+
+        .input-container input {
+            flex: 1;
+            padding: 12px 16px;
+            border: 2px solid #e9ecef;
+            border-radius: 25px;
+            font-size: 1em;
+            outline: none;
+            transition: border-color 0.3s;
+        }
+
+        .input-container input:focus {
+            border-color: #667eea;
+        }
+
+        .input-container button {
+            padding: 12px 24px;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            border: none;
+            border-radius: 25px;
+            cursor: pointer;
+            font-size: 1em;
+            transition: transform 0.2s;
+        }
+
+        .input-container button:hover {
+            transform: translateY(-2px);
+        }
+
+        .input-container button:disabled {
+            opacity: 0.6;
+            cursor: not-allowed;
+            transform: none;
+        }
+
+        .login-modal {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0,0,0,0.8);
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            z-index: 1000;
+        }
+
+        .login-form {
+            background: white;
+            padding: 40px;
+            border-radius: 20px;
+            text-align: center;
+            box-shadow: 0 20px 40px rgba(0,0,0,0.3);
+        }
+
+        .login-form h2 {
+            margin-bottom: 20px;
+            color: #333;
+        }
+
+        .login-form input {
+            width: 100%;
+            padding: 15px;
+            margin-bottom: 20px;
+            border: 2px solid #e9ecef;
+            border-radius: 10px;
+            font-size: 1em;
+            outline: none;
+        }
+
+        .login-form input:focus {
+            border-color: #667eea;
+        }
+
+        .login-form button {
+            width: 100%;
+            padding: 15px;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            border: none;
+            border-radius: 10px;
+            cursor: pointer;
+            font-size: 1em;
+            transition: transform 0.2s;
+        }
+
+        .login-form button:hover {
+            transform: translateY(-2px);
+        }
+
+        .hidden {
+            display: none;
+        }
+
+        .error {
+            background: #f8d7da;
+            color: #721c24;
+            padding: 10px;
+            border-radius: 5px;
+            margin: 10px 0;
+            border: 1px solid #f5c6cb;
+        }
+
+        /* Estilos para chamadas de vídeo */
+        .video-call-container {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0,0,0,0.9);
+            z-index: 2000;
+            display: none;
+            flex-direction: column;
+        }
+
+        .video-call-container.active {
+            display: flex;
+        }
+
+        .video-grid {
+            flex: 1;
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 20px;
+            padding: 20px;
+        }
+
+        .video-container {
+            position: relative;
+            background: #000;
+            border-radius: 15px;
+            overflow: hidden;
+            min-height: 300px;
+        }
+
+        .video-container video {
+            width: 100%;
+            height: 100%;
+            object-fit: cover;
+        }
+
+        .video-label {
+            position: absolute;
+            bottom: 10px;
+            left: 10px;
+            background: rgba(0,0,0,0.7);
+            color: white;
+            padding: 5px 10px;
+            border-radius: 15px;
+            font-size: 0.9em;
+        }
+
+        .video-controls {
+            display: flex;
+            justify-content: center;
+            gap: 15px;
+            padding: 20px;
+            background: rgba(0,0,0,0.8);
+        }
+
+        .video-control-btn {
+            width: 60px;
+            height: 60px;
+            border-radius: 50%;
+            border: none;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 1.5em;
+            transition: all 0.3s;
+        }
+
+        .video-control-btn:hover {
+            transform: scale(1.1);
+        }
+
+        .video-control-btn.end-call {
+            background: #dc3545;
+            color: white;
+        }
+
+        .video-control-btn.toggle-video {
+            background: #28a745;
+            color: white;
+        }
+
+        .video-control-btn.toggle-audio {
+            background: #007bff;
+            color: white;
+        }
+
+        .video-control-btn.muted {
+            background: #dc3545;
+        }
+
+        .video-control-btn.video-off {
+            background: #dc3545;
+        }
+
+        .call-notification {
+            position: fixed;
+            top: 20px;
+            right: 20px;
+            background: white;
+            padding: 20px;
+            border-radius: 15px;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.3);
+            z-index: 1500;
+            min-width: 300px;
+        }
+
+        .call-notification h3 {
+            margin-bottom: 10px;
+            color: #333;
+        }
+
+        .call-notification-buttons {
+            display: flex;
+            gap: 10px;
+            margin-top: 15px;
+        }
+
+        .call-notification-btn {
+            flex: 1;
+            padding: 10px;
+            border: none;
+            border-radius: 8px;
+            cursor: pointer;
+            font-weight: bold;
+        }
+
+        .call-notification-btn.accept {
+            background: #28a745;
+            color: white;
+        }
+
+        .call-notification-btn.decline {
+            background: #dc3545;
+            color: white;
+        }
+
+        .user-list-item {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 8px 0;
+            border-bottom: 1px solid #e9ecef;
+        }
+
+        .user-list-item:last-child {
+            border-bottom: none;
+        }
+
+        .video-call-btn {
+            background: #007bff;
+            color: white;
+            border: none;
+            padding: 5px 10px;
+            border-radius: 15px;
+            cursor: pointer;
+            font-size: 0.8em;
+            transition: background 0.3s;
+        }
+
+        .video-call-btn:hover {
+            background: #0056b3;
+        }
+
+        .video-call-btn:disabled {
+            background: #6c757d;
+            cursor: not-allowed;
+        }
+
+    </style>
+</head>
+<body>
+    <!-- Modal de Login -->
+    <div id="loginModal" class="login-modal">
+        <div class="login-form">
+            <h2>Bem-vindo ao Chat!</h2>
+            <input type="text" id="usernameInput" placeholder="Digite seu nome de usuário" maxlength="20">
+            <button onclick="joinChat()">Entrar no Chat</button>
+        </div>
+    </div>
+
+    <!-- Container do Chat -->
+    <div id="chatContainer" class="chat-container hidden">
+        <div class="chat-header">
+            💬 Chat em Tempo Real
+        </div>
+        
+        <div id="usersOnline" class="users-online">
+            Usuários online: <span id="userCount">0</span>
+            <div id="usersList" style="margin-top: 10px; max-height: 150px; overflow-y: auto;">
+                <!-- Lista de usuários será inserida aqui -->
+            </div>
+        </div>
+        
+        <div id="messagesContainer" class="messages-container">
+            <!-- Mensagens aparecerão aqui -->
+        </div>
+        
+        <div id="typingIndicator" class="typing-indicator hidden">
+            <!-- Indicador de digitação -->
+        </div>
+        
+        <div class="input-container">
+            <input type="text" id="messageInput" placeholder="Digite sua mensagem..." disabled>
+            <button id="sendButton" onclick="sendMessage()" disabled>Enviar</button>
+        </div>
+    </div>
+
+
+    <!-- Notificação de Chamada -->
+    <div id="callNotification" class="call-notification hidden">
+        <h3>📹 Chamada de Vídeo</h3>
+        <p id="callFromUser">Usuário está chamando...</p>
+        <div class="call-notification-buttons">
+            <button class="call-notification-btn accept" onclick="acceptVideoCall()">Aceitar</button>
+            <button class="call-notification-btn decline" onclick="declineVideoCall()">Recusar</button>
+        </div>
+    </div>
+
+    <!-- Container de Chamada de Vídeo -->
+    <div id="videoCallContainer" class="video-call-container">
+        <div class="video-grid">
+            <div class="video-container">
+                <video id="localVideo" autoplay muted playsinline></video>
+                <div class="video-label">Você</div>
+            </div>
+            <div class="video-container">
+                <video id="remoteVideo" autoplay playsinline></video>
+                <div class="video-label" id="remoteUserLabel">Usuário Remoto</div>
+            </div>
+        </div>
+        <div class="video-controls">
+            <button class="video-control-btn toggle-audio" id="toggleAudioBtn" onclick="toggleAudio()">
+                🎤
+            </button>
+            <button class="video-control-btn toggle-video" id="toggleVideoBtn" onclick="toggleVideo()">
+                📹
+            </button>
+            <button class="video-control-btn end-call" onclick="endVideoCall()">
+                📞
+            </button>
+        </div>
+    </div>
+
+    <!-- Socket.IO Client -->
+    <script src="/socket.io/socket.io.js"></script>
+    <script>
+        let socket;
+        let currentUsername;
+        let typingTimer;
+        
+        // Variáveis WebRTC
+        let localStream;
+        let remoteStream;
+        let peerConnection;
+        let currentCallId;
+        let currentCallData;
+        let isVideoEnabled = true;
+        let isAudioEnabled = true;
+        
+        // Configuração STUN/TURN servers
+        const rtcConfiguration = {
+            iceServers: [
+                { urls: 'stun:stun.l.google.com:19302' },
+                { urls: 'stun:stun1.l.google.com:19302' }
+            ]
+        };
+
+        // Conectar ao servidor Socket.IO
+        socket = io();
+
+        // Eventos do Socket.IO
+        socket.on('connect', () => {
+            console.log('Conectado ao servidor');
+        });
+
+        socket.on('disconnect', () => {
+            console.log('Desconectado do servidor');
+            showError('Conexão perdida. Tentando reconectar...');
+        });
+
+        socket.on('user_joined', (data) => {
+            addSystemMessage(data.message);
+        });
+
+        socket.on('user_left', (data) => {
+            addSystemMessage(data.message);
+        });
+
+        socket.on('users_updated', (users) => {
+            updateUsersOnline(users);
+        });
+
+        socket.on('message', (data) => {
+            addMessage(data, data.id === socket.id);
+        });
+
+        socket.on('private_message', (data) => {
+            addPrivateMessage(data);
+        });
+
+        socket.on('user_typing', (data) => {
+            showTypingIndicator(data);
+        });
+
+        socket.on('error', (data) => {
+            showError(data.message);
+        });
+
+        // Eventos WebRTC
+        socket.on('video_call_request', (data) => {
+            currentCallData = data;
+            document.getElementById('callFromUser').textContent = `${data.from} está chamando...`;
+            document.getElementById('callNotification').classList.remove('hidden');
+        });
+
+        socket.on('video_call_response', (data) => {
+            if (data.accepted) {
+                startVideoCall();
+            } else {
+                showError('Chamada recusada');
+                hideCallNotification();
+            }
+        });
+
+        socket.on('webrtc_offer', async (data) => {
+            try {
+                await peerConnection.setRemoteDescription(new RTCSessionDescription(data.offer));
+                const answer = await peerConnection.createAnswer();
+                await peerConnection.setLocalDescription(answer);
+                
+                socket.emit('webrtc_answer', {
+                    answer: answer,
+                    targetSocketId: data.fromSocketId,
+                    callId: data.callId
+                });
+            } catch (error) {
+                console.error('Erro ao processar offer:', error);
+            }
+        });
+
+        socket.on('webrtc_answer', async (data) => {
+            try {
+                await peerConnection.setRemoteDescription(new RTCSessionDescription(data.answer));
+            } catch (error) {
+                console.error('Erro ao processar answer:', error);
+            }
+        });
+
+        socket.on('webrtc_ice_candidate', async (data) => {
+            try {
+                await peerConnection.addIceCandidate(new RTCIceCandidate(data.candidate));
+            } catch (error) {
+                console.error('Erro ao adicionar ICE candidate:', error);
+            }
+        });
+
+        socket.on('video_call_end', (data) => {
+            endVideoCall();
+            showError('Chamada encerrada');
+        });
+
+        // Funções do Chat
+        function joinChat() {
+            const username = document.getElementById('usernameInput').value.trim();
+            
+            if (username.length < 2) {
+                alert('Nome de usuário deve ter pelo menos 2 caracteres');
+                return;
+            }
+
+            currentUsername = username;
+            socket.emit('join', username);
+            
+            document.getElementById('loginModal').classList.add('hidden');
+            document.getElementById('chatContainer').classList.remove('hidden');
+            document.getElementById('messageInput').disabled = false;
+            document.getElementById('sendButton').disabled = false;
+            document.getElementById('messageInput').focus();
+        }
+
+        function sendMessage() {
+            const messageInput = document.getElementById('messageInput');
+            const message = messageInput.value.trim();
+            
+            if (message.length === 0) return;
+
+            socket.emit('message', { message: message });
+            messageInput.value = '';
+            messageInput.focus();
+        }
+
+        function addMessage(data, isOwn) {
+            const messagesContainer = document.getElementById('messagesContainer');
+            const messageDiv = document.createElement('div');
+            messageDiv.className = `message ${isOwn ? 'own' : 'other'}`;
+            
+            const time = new Date(data.timestamp).toLocaleTimeString('pt-BR', {
+                hour: '2-digit',
+                minute: '2-digit'
+            });
+
+            messageDiv.innerHTML = `
+                <div class="message-header">${data.username}</div>
+                <div class="message-content">${escapeHtml(data.message)}</div>
+                <div class="message-time">${time}</div>
+            `;
+
+            messagesContainer.appendChild(messageDiv);
+            messagesContainer.scrollTop = messagesContainer.scrollHeight;
+        }
+
+        function addPrivateMessage(data) {
+            const messagesContainer = document.getElementById('messagesContainer');
+            const messageDiv = document.createElement('div');
+            messageDiv.className = 'message private';
+            
+            const time = new Date(data.timestamp).toLocaleTimeString('pt-BR', {
+                hour: '2-digit',
+                minute: '2-digit'
+            });
+
+            messageDiv.innerHTML = `
+                <div class="message-header">🔒 ${data.from} → ${data.to}</div>
+                <div class="message-content">${escapeHtml(data.message)}</div>
+                <div class="message-time">${time}</div>
+            `;
+
+            messagesContainer.appendChild(messageDiv);
+            messagesContainer.scrollTop = messagesContainer.scrollHeight;
+        }
+
+        function addSystemMessage(message) {
+            const messagesContainer = document.getElementById('messagesContainer');
+            const messageDiv = document.createElement('div');
+            messageDiv.className = 'message system';
+            messageDiv.textContent = message;
+            
+            messagesContainer.appendChild(messageDiv);
+            messagesContainer.scrollTop = messagesContainer.scrollHeight;
+        }
+
+        function updateUsersOnline(users) {
+            const userCount = document.getElementById('userCount');
+            userCount.textContent = users.length;
+            
+            const usersList = document.getElementById('usersList');
+            const userItems = users
+                .filter(user => user !== currentUsername)
+                .map(user => `
+                    <div class="user-list-item">
+                        <span>${escapeHtml(user)}</span>
+                        <button class="video-call-btn" onclick="startVideoCallRequest('${escapeHtml(user)}')">
+                            📹 Chamada
+                        </button>
+                    </div>
+                `).join('');
+            
+            usersList.innerHTML = userItems;
+        }
+
+        function showTypingIndicator(data) {
+            const typingIndicator = document.getElementById('typingIndicator');
+            
+            if (data.isTyping) {
+                typingIndicator.textContent = `${data.username} está digitando...`;
+                typingIndicator.classList.remove('hidden');
+            } else {
+                typingIndicator.classList.add('hidden');
+            }
+        }
+
+        function showError(message) {
+            const messagesContainer = document.getElementById('messagesContainer');
+            const errorDiv = document.createElement('div');
+            errorDiv.className = 'error';
+            errorDiv.textContent = message;
+            
+            messagesContainer.appendChild(errorDiv);
+            messagesContainer.scrollTop = messagesContainer.scrollHeight;
+        }
+
+        function escapeHtml(text) {
+            const div = document.createElement('div');
+            div.textContent = text;
+            return div.innerHTML;
+        }
+
+        // Event Listeners
+        document.getElementById('messageInput').addEventListener('keypress', (e) => {
+            if (e.key === 'Enter') {
+                sendMessage();
+            } else {
+                // Indicar que está digitando
+                socket.emit('typing', { isTyping: true });
+                
+                clearTimeout(typingTimer);
+                typingTimer = setTimeout(() => {
+                    socket.emit('typing', { isTyping: false });
+                }, 1000);
+            }
+        });
+
+        // Permitir login com Enter
+        document.getElementById('usernameInput').addEventListener('keypress', (e) => {
+            if (e.key === 'Enter') {
+                joinChat();
+            }
+        });
+
+        // Funções WebRTC
+        async function startVideoCallRequest(targetUser) {
+            try {
+                // Solicitar permissões de mídia
+                localStream = await navigator.mediaDevices.getUserMedia({
+                    video: true,
+                    audio: true
+                });
+
+                // Criar peer connection
+                peerConnection = new RTCPeerConnection(rtcConfiguration);
+
+                // Adicionar stream local
+                localStream.getTracks().forEach(track => {
+                    peerConnection.addTrack(track, localStream);
+                });
+
+                // Configurar eventos do peer connection
+                setupPeerConnectionEvents();
+
+                // Gerar ID único para a chamada
+                currentCallId = Date.now().toString();
+
+                // Solicitar chamada
+                socket.emit('video_call_request', {
+                    targetUser: targetUser,
+                    callId: currentCallId
+                });
+
+                // Mostrar interface de chamada
+                document.getElementById('videoCallContainer').classList.add('active');
+                document.getElementById('localVideo').srcObject = localStream;
+                document.getElementById('remoteUserLabel').textContent = targetUser;
+
+            } catch (error) {
+                console.error('Erro ao iniciar chamada:', error);
+                showError('Erro ao acessar câmera/microfone');
+            }
+        }
+
+        async function acceptVideoCall() {
+            try {
+                // Solicitar permissões de mídia
+                localStream = await navigator.mediaDevices.getUserMedia({
+                    video: true,
+                    audio: true
+                });
+
+                // Criar peer connection
+                peerConnection = new RTCPeerConnection(rtcConfiguration);
+
+                // Adicionar stream local
+                localStream.getTracks().forEach(track => {
+                    peerConnection.addTrack(track, localStream);
+                });
+
+                // Configurar eventos do peer connection
+                setupPeerConnectionEvents();
+
+                // Aceitar chamada
+                socket.emit('video_call_response', {
+                    accepted: true,
+                    targetSocketId: currentCallData.fromSocketId,
+                    callId: currentCallData.callId
+                });
+
+                // Mostrar interface de chamada
+                document.getElementById('videoCallContainer').classList.add('active');
+                document.getElementById('localVideo').srcObject = localStream;
+                document.getElementById('remoteUserLabel').textContent = currentCallData.from;
+                hideCallNotification();
+
+            } catch (error) {
+                console.error('Erro ao aceitar chamada:', error);
+                showError('Erro ao acessar câmera/microfone');
+                declineVideoCall();
+            }
+        }
+
+        function declineVideoCall() {
+            socket.emit('video_call_response', {
+                accepted: false,
+                targetSocketId: currentCallData.fromSocketId,
+                callId: currentCallData.callId
+            });
+            hideCallNotification();
+        }
+
+        function hideCallNotification() {
+            document.getElementById('callNotification').classList.add('hidden');
+            currentCallData = null;
+        }
+
+        function setupPeerConnectionEvents() {
+            // Evento quando recebe stream remoto
+            peerConnection.ontrack = (event) => {
+                remoteStream = event.streams[0];
+                document.getElementById('remoteVideo').srcObject = remoteStream;
+            };
+
+            // Evento para ICE candidates
+            peerConnection.onicecandidate = (event) => {
+                if (event.candidate) {
+                    socket.emit('webrtc_ice_candidate', {
+                        candidate: event.candidate,
+                        targetSocketId: currentCallData ? currentCallData.fromSocketId : null,
+                        callId: currentCallId
+                    });
+                }
+            };
+
+            // Evento quando conexão muda de estado
+            peerConnection.onconnectionstatechange = () => {
+                console.log('Estado da conexão:', peerConnection.connectionState);
+                if (peerConnection.connectionState === 'failed') {
+                    showError('Conexão falhou');
+                    endVideoCall();
+                }
+            };
+        }
+
+        async function startVideoCall() {
+            try {
+                // Criar offer
+                const offer = await peerConnection.createOffer();
+                await peerConnection.setLocalDescription(offer);
+
+                // Enviar offer
+                socket.emit('webrtc_offer', {
+                    offer: offer,
+                    targetSocketId: currentCallData.fromSocketId,
+                    callId: currentCallId
+                });
+
+            } catch (error) {
+                console.error('Erro ao criar offer:', error);
+            }
+        }
+
+        function endVideoCall() {
+            // Parar streams
+            if (localStream) {
+                localStream.getTracks().forEach(track => track.stop());
+                localStream = null;
+            }
+
+            // Fechar peer connection
+            if (peerConnection) {
+                peerConnection.close();
+                peerConnection = null;
+            }
+
+            // Limpar elementos de vídeo
+            document.getElementById('localVideo').srcObject = null;
+            document.getElementById('remoteVideo').srcObject = null;
+
+            // Esconder interface de chamada
+            document.getElementById('videoCallContainer').classList.remove('active');
+
+            // Notificar outro usuário
+            if (currentCallData) {
+                socket.emit('video_call_end', {
+                    targetSocketId: currentCallData.fromSocketId,
+                    callId: currentCallId
+                });
+            }
+
+            // Resetar variáveis
+            currentCallId = null;
+            currentCallData = null;
+            isVideoEnabled = true;
+            isAudioEnabled = true;
+            updateControlButtons();
+        }
+
+        function toggleVideo() {
+            if (localStream) {
+                const videoTrack = localStream.getVideoTracks()[0];
+                if (videoTrack) {
+                    videoTrack.enabled = !videoTrack.enabled;
+                    isVideoEnabled = videoTrack.enabled;
+                    updateControlButtons();
+                }
+            }
+        }
+
+        function toggleAudio() {
+            if (localStream) {
+                const audioTrack = localStream.getAudioTracks()[0];
+                if (audioTrack) {
+                    audioTrack.enabled = !audioTrack.enabled;
+                    isAudioEnabled = audioTrack.enabled;
+                    updateControlButtons();
+                }
+            }
+        }
+
+        function updateControlButtons() {
+            const videoBtn = document.getElementById('toggleVideoBtn');
+            const audioBtn = document.getElementById('toggleAudioBtn');
+
+            if (isVideoEnabled) {
+                videoBtn.classList.remove('video-off');
+                videoBtn.textContent = '📹';
+            } else {
+                videoBtn.classList.add('video-off');
+                videoBtn.textContent = '📷';
+            }
+
+            if (isAudioEnabled) {
+                audioBtn.classList.remove('muted');
+                audioBtn.textContent = '🎤';
+            } else {
+                audioBtn.classList.add('muted');
+                audioBtn.textContent = '🔇';
+            }
+        }
+    </script>
+</body>
+</html>

@@ -1,0 +1,22 @@
+{
+  "name": "chat-server",
+  "version": "1.0.0",
+  "description": "Servidor de chat com Express e Socket.IO",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js",
+    "start:network": "node start-server.js",
+    "stop": "node stop-server.js",
+    "dev": "nodemon server.js"
+  },
+  "dependencies": {
+    "express": "^4.18.2",
+    "socket.io": "^4.7.5"
+  },
+  "devDependencies": {
+    "nodemon": "^3.0.2"
+  },
+  "keywords": ["chat", "websocket", "socket.io", "express"],
+  "author": "",
+  "license": "MIT"
+}
