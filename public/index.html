@@ -588,12 +588,36 @@
             document.getElementById('callNotification').classList.remove('hidden');
         });
 
-        socket.on('video_call_response', (data) => {
+        socket.on('video_call_response', async (data) => {
             if (data.accepted) {
-                startVideoCall();
+                console.log('✅ Chamada aceita por:', data.from);
+                // Agora que a chamada foi aceita, criar o offer
+                try {
+                    console.log('🎬 Criando offer após chamada aceita...');
+                    const offer = await peerConnection.createOffer();
+                    await peerConnection.setLocalDescription(offer);
+                    
+                    // Para quem iniciou a chamada, precisamos encontrar o socket do usuário que aceitou
+                    // Vamos buscar na lista de usuários conectados
+                    const targetSocket = Array.from(io.sockets.sockets.values())
+                        .find(s => s.username === data.from);
+                    
+                    if (targetSocket) {
+                        socket.emit('webrtc_offer', {
+                            offer: offer,
+                            targetSocketId: targetSocket.id,
+                            callId: currentCallId
+                        });
+                        console.log('📤 Offer enviado para:', data.from);
+                    } else {
+                        console.error('❌ Socket do usuário não encontrado');
+                    }
+                } catch (error) {
+                    console.error('❌ Erro ao criar offer após aceite:', error);
+                }
             } else {
                 showError('Chamada recusada');
-                hideCallNotification();
+                endVideoCall();
             }
         });
 
@@ -829,6 +853,9 @@
                 document.getElementById('localVideo').srcObject = localStream;
                 document.getElementById('remoteUserLabel').textContent = targetUser;
 
+                // Aguardar resposta da chamada antes de criar offer
+                console.log('⏳ Aguardando usuário aceitar a chamada...');
+
             } catch (error) {
                 console.error('Erro ao iniciar chamada:', error);
                 showError('Erro ao acessar câmera/microfone');
@@ -866,6 +893,24 @@
                 document.getElementById('localVideo').srcObject = localStream;
                 document.getElementById('remoteUserLabel').textContent = currentCallData.from;
                 hideCallNotification();
+
+                // Aguardar um pouco e então criar answer
+                setTimeout(async () => {
+                    try {
+                        console.log('🎬 Criando answer para chamada aceita...');
+                        const answer = await peerConnection.createAnswer();
+                        await peerConnection.setLocalDescription(answer);
+                        
+                        socket.emit('webrtc_answer', {
+                            answer: answer,
+                            targetSocketId: currentCallData.fromSocketId,
+                            callId: currentCallData.callId
+                        });
+                        console.log('📤 Answer enviada para:', currentCallData.from);
+                    } catch (error) {
+                        console.error('❌ Erro ao criar answer:', error);
+                    }
+                }, 1000);
 
             } catch (error) {
                 console.error('Erro ao aceitar chamada:', error);
@@ -951,32 +996,6 @@
             };
         }
 
-        async function startVideoCall() {
-            try {
-                console.log('🎬 Iniciando processo de chamada...');
-                console.log('📊 Configuração WebRTC:', rtcConfiguration);
-                
-                // Criar offer
-                console.log('📤 Criando offer...');
-                const offer = await peerConnection.createOffer();
-                console.log('✅ Offer criado:', offer);
-                
-                await peerConnection.setLocalDescription(offer);
-                console.log('✅ Local description definida');
-
-                // Enviar offer
-                console.log('📤 Enviando offer para:', currentCallData.fromSocketId);
-                socket.emit('webrtc_offer', {
-                    offer: offer,
-                    targetSocketId: currentCallData.fromSocketId,
-                    callId: currentCallId
-                });
-
-            } catch (error) {
-                console.error('❌ Erro ao criar offer:', error);
-                showError('Erro ao iniciar chamada: ' + error.message);
-            }
-        }
 
         // Função para testar conectividade WebRTC
         async function testWebRTCConnectivity() {
