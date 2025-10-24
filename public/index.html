@@ -505,6 +505,7 @@
         let currentCallData;
         let isVideoEnabled = true;
         let isAudioEnabled = true;
+        let remoteSocketId = null;
         
         // Configuração STUN/TURN servers melhorada
         const rtcConfiguration = {
@@ -584,6 +585,7 @@
         // Eventos WebRTC
         socket.on('video_call_request', (data) => {
             currentCallData = data;
+            remoteSocketId = data.fromSocketId;
             document.getElementById('callFromUser').textContent = `${data.from} está chamando...`;
             document.getElementById('callNotification').classList.remove('hidden');
         });
@@ -597,21 +599,15 @@
                     const offer = await peerConnection.createOffer();
                     await peerConnection.setLocalDescription(offer);
                     
-                    // Para quem iniciou a chamada, precisamos encontrar o socket do usuário que aceitou
-                    // Vamos buscar na lista de usuários conectados
-                    const targetSocket = Array.from(io.sockets.sockets.values())
-                        .find(s => s.username === data.from);
-                    
-                    if (targetSocket) {
-                        socket.emit('webrtc_offer', {
-                            offer: offer,
-                            targetSocketId: targetSocket.id,
-                            callId: currentCallId
-                        });
-                        console.log('📤 Offer enviado para:', data.from);
-                    } else {
-                        console.error('❌ Socket do usuário não encontrado');
-                    }
+                    // Guardar o socketId do remoto informado na resposta
+                    remoteSocketId = data.fromSocketId;
+
+                    socket.emit('webrtc_offer', {
+                        offer: offer,
+                        targetSocketId: remoteSocketId,
+                        callId: currentCallId
+                    });
+                    console.log('📤 Offer enviado para:', data.from, 'socket:', remoteSocketId);
                 } catch (error) {
                     console.error('❌ Erro ao criar offer após aceite:', error);
                 }
@@ -626,6 +622,7 @@
                 console.log('📥 Recebendo offer de:', data.from);
                 await peerConnection.setRemoteDescription(new RTCSessionDescription(data.offer));
                 console.log('✅ Remote description definida');
+                remoteSocketId = data.fromSocketId;
                 
                 const answer = await peerConnection.createAnswer();
                 console.log('📤 Criando answer...');
@@ -634,7 +631,7 @@
                 
                 socket.emit('webrtc_answer', {
                     answer: answer,
-                    targetSocketId: data.fromSocketId,
+                    targetSocketId: remoteSocketId,
                     callId: data.callId
                 });
                 console.log('📤 Answer enviada para:', data.from);
@@ -894,23 +891,7 @@
                 document.getElementById('remoteUserLabel').textContent = currentCallData.from;
                 hideCallNotification();
 
-                // Aguardar um pouco e então criar answer
-                setTimeout(async () => {
-                    try {
-                        console.log('🎬 Criando answer para chamada aceita...');
-                        const answer = await peerConnection.createAnswer();
-                        await peerConnection.setLocalDescription(answer);
-                        
-                        socket.emit('webrtc_answer', {
-                            answer: answer,
-                            targetSocketId: currentCallData.fromSocketId,
-                            callId: currentCallData.callId
-                        });
-                        console.log('📤 Answer enviada para:', currentCallData.from);
-                    } catch (error) {
-                        console.error('❌ Erro ao criar answer:', error);
-                    }
-                }, 1000);
+                // Answer será criada ao receber o offer no handler 'webrtc_offer'
 
             } catch (error) {
                 console.error('Erro ao aceitar chamada:', error);
@@ -948,7 +929,7 @@
                     console.log('🧊 ICE candidate local:', event.candidate);
                     socket.emit('webrtc_ice_candidate', {
                         candidate: event.candidate,
-                        targetSocketId: currentCallData ? currentCallData.fromSocketId : null,
+                        targetSocketId: remoteSocketId,
                         callId: currentCallId
                     });
                 } else {

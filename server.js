@@ -128,6 +128,7 @@ io.on('connection', (socket) => {
       targetSocket.emit('video_call_response', {
         accepted: data.accepted,
         from: socket.username || 'Usuário Anônimo',
+        fromSocketId: socket.id,
         callId: data.callId
       });
       console.log(`Resposta da chamada: ${socket.username} ${data.accepted ? 'aceitou' : 'rejeitou'} a chamada`);
