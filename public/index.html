@@ -68,7 +68,27 @@
 
     <!-- Scripts -->
     <script src="/socket.io/socket.io.js"></script>
-    <script src="https://cdn.jsdelivr.net/npm/mediasoup-client@3.6.8/lib/mediasoup-client.min.js"></script>
+    <script src="https://unpkg.com/mediasoup-client@3.6.8/lib/mediasoup-client.min.js"></script>
+    <script>
+        // Verificar se MediaSoup Client foi carregado
+        window.addEventListener('load', () => {
+            if (typeof mediasoupClient === 'undefined') {
+                console.error('MediaSoup Client não foi carregado!');
+                document.body.innerHTML = `
+                    <div style="padding: 20px; text-align: center; color: red;">
+                        <h2>❌ Erro: MediaSoup Client não carregado</h2>
+                        <p>O MediaSoup Client não foi carregado corretamente.</p>
+                        <p>Verifique sua conexão com a internet ou tente recarregar a página.</p>
+                        <button onclick="location.reload()" style="padding: 10px 20px; margin-top: 10px;">
+                            🔄 Recarregar Página
+                        </button>
+                    </div>
+                `;
+            } else {
+                console.log('✅ MediaSoup Client carregado com sucesso');
+            }
+        });
+    </script>
     <script src="app.js"></script>
 </body>
 </html>

@@ -189,6 +189,12 @@ class MediaSoupClient {
 
     async handleRouterCapabilities(capabilities) {
         try {
+            // Verificar se MediaSoup Client está disponível
+            if (typeof mediasoupClient === 'undefined') {
+                this.log('MediaSoup Client não está disponível! Recarregue a página.', 'error');
+                return;
+            }
+            
             this.device = new mediasoupClient.Device();
             await this.device.load({ routerRtpCapabilities: capabilities });
             this.log('Device carregado com sucesso', 'success');
