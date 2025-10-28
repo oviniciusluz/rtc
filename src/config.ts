@@ -1,4 +1,5 @@
 import type * as mediasoup from 'mediasoup';
+import { getRailwayPublicIp, isRailwayEnvironment } from './railway';
 
 export const workerSettings = {
   logLevel: 'warn',
@@ -56,13 +57,13 @@ export const transportSettings = {
   listenIps: [
     {
       ip: '0.0.0.0',
-      announcedIp: process.env.PUBLIC_IP || '0.0.0.0',
+      announcedIp: process.env.PUBLIC_IP || getRailwayPublicIp() || undefined,
     },
   ],
 
   enableUdp: true,
   enableTcp: true,
-  preferUdp: true,
+  preferUdp: !isRailwayEnvironment(), // Prefer TCP on Railway due to UDP limitations
 
   enableSctp: true,
   numSctpStreams: {

@@ -4,8 +4,8 @@ export class Peer {
   public readonly id: string;
   public name: string;
 
-  public sendTransport: mediasoup.types.WebRtcTransport;
-  public recvTransport: mediasoup.types.WebRtcTransport;
+  public sendTransport?: mediasoup.types.WebRtcTransport;
+  public recvTransport?: mediasoup.types.WebRtcTransport;
 
   public producers: Map<string, mediasoup.types.Producer> = new Map();
   public consumers: Map<string, mediasoup.types.Consumer> = new Map();

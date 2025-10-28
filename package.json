@@ -1,10 +1,28 @@
 {
+  "name": "nexus-mediasoup-server",
+  "version": "1.0.0",
+  "description": "MediaSoup WebRTC server",
+  "main": "dist/server.js",
+  "scripts": {
+    "start": "node dist/server.js",
+    "dev": "ts-node src/server.ts",
+    "build": "tsc",
+    "clean": "rm -rf dist",
+    "postinstall": "npm run build",
+    "railway:build": "npm run build",
+    "railway:start": "npm start"
+  },
   "dependencies": {
     "express": "^5.1.0",
     "mediasoup": "^3.19.6",
-    "socket.io": "^4.8.1"
+    "socket.io": "^4.8.1",
+    "cors": "^2.8.5"
   },
   "devDependencies": {
-    "@types/node": "^24.9.1"
+    "@types/node": "^24.9.1",
+    "@types/cors": "^2.8.17",
+    "@types/express": "^5.0.0",
+    "ts-node": "^10.9.2",
+    "typescript": "^5.3.3"
   }
 }

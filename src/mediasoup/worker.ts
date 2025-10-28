@@ -1,4 +1,4 @@
-import mediasoup from 'mediasoup';
+import * as mediasoup from 'mediasoup';
 import { workerSettings } from '../config';
 
 export class WorkerManager {

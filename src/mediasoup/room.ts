@@ -1,17 +1,19 @@
-import mediasoup from 'mediasoup';
+import * as mediasoup from 'mediasoup';
 import { Peer } from './peer';
 import { workerManager } from './worker';
 import { routerSettings } from '../config';
 
 export class Room {
-  private readonly id: string;
+  public readonly id: string;
   private router: mediasoup.types.Router;
+  private worker: mediasoup.types.Worker;
   private peers: Map<string, Peer> = new Map();
   private producers: Map<string, mediasoup.types.Producer> = new Map();
 
-  constructor(id: string, router: mediasoup.types.Router) {
+  constructor(id: string, router: mediasoup.types.Router, worker: mediasoup.types.Worker) {
     this.id = id;
     this.router = router;
+    this.worker = worker;
     console.log(`Room ${this.id} created`);
   }
 
@@ -29,6 +31,10 @@ export class Room {
 
   getRouter() {
     return this.router;
+  }
+
+  getWorker() {
+    return this.worker;
   }
 
   async addProducer(producer: mediasoup.types.Producer, peerId: string) {
@@ -75,6 +81,6 @@ export class RoomFactory {
 
     const router = await worker.createRouter(routerSettings);
 
-    return new Room(roomId, router);
+    return new Room(roomId, router, worker);
   }
 }
