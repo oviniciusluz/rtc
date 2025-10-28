@@ -46,7 +46,11 @@ export class Room {
     for (const [otherPeerId, otherPeer] of this.peers.entries()) {
       if (otherPeerId !== peerId) {
         console.log(`Notifying ${otherPeer.name} about new producer ${producer.id}`);
-      };
+        
+        // Enviar notificação via socket para cada peer
+        // Nota: Esta implementação assume que o servidor tem acesso aos sockets
+        // Em uma implementação real, você precisaria passar o socket ou usar um evento global
+      }
     }
   }
   

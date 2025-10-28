@@ -61,6 +61,13 @@ export const transportSettings = {
     },
   ],
 
+  // Adicionar STUN servers para melhor conectividade
+  iceServers: [
+    { urls: 'stun:stun.l.google.com:19302' },
+    { urls: 'stun:stun1.l.google.com:19302' },
+    { urls: 'stun:stun2.l.google.com:19302' },
+  ],
+
   enableUdp: true,
   enableTcp: true,
   preferUdp: !isRailwayEnvironment(), // Prefer TCP on Railway due to UDP limitations

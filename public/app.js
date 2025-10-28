@@ -124,15 +124,18 @@ class MediaSoupClient {
     }
 
     setupSocketListeners() {
-        this.socket.on('room-joined', (data) => {
-            this.log(`Entrou na sala: ${data.roomId}`, 'success');
-            this.updateStatus(this.roomStatus, `Conectado à sala: ${data.roomId}`, 'connected');
-            this.updateStatus(this.peersStatus, `${data.peers.length} peers na sala`, 'connected');
-            
-            // Habilitar controles de mídia
-            this.startAudioBtn.disabled = false;
-            this.startVideoBtn.disabled = false;
-        });
+        this.      socket.on('room-joined', async (data) => {
+          this.log(`Entrou na sala: ${data.roomId}`, 'success');
+          this.updateStatus(this.roomStatus, `Conectado à sala: ${data.roomId}`, 'connected');
+          this.updateStatus(this.peersStatus, `${data.peers.length} peers na sala`, 'connected');
+          
+          // Obter RTP capabilities primeiro
+          this.socket.emit('get-router-rtp-capabilities');
+          
+          // Habilitar controles de mídia
+          this.startAudioBtn.disabled = false;
+          this.startVideoBtn.disabled = false;
+      });
 
         this.socket.on('peer-joined', (peerInfo) => {
             this.log(`Novo peer conectado: ${peerInfo.name}`, 'info');
@@ -189,9 +192,40 @@ class MediaSoupClient {
             this.device = new mediasoupClient.Device();
             await this.device.load({ routerRtpCapabilities: capabilities });
             this.log('Device carregado com sucesso', 'success');
+            
+            // Criar transports automaticamente após carregar o device
+            await this.createSendTransport();
+            await this.createRecvTransport();
+            
         } catch (error) {
             this.log(`Erro ao carregar device: ${error.message}`, 'error');
         }
+    }
+
+    async createSendTransport() {
+        return new Promise((resolve, reject) => {
+            this.socket.emit('create-transport', { direction: 'send' }, (error, data) => {
+                if (error) {
+                    reject(new Error(error.message));
+                } else {
+                    this.handleTransportCreated(data);
+                    resolve(data);
+                }
+            });
+        });
+    }
+
+    async createRecvTransport() {
+        return new Promise((resolve, reject) => {
+            this.socket.emit('create-transport', { direction: 'recv' }, (error, data) => {
+                if (error) {
+                    reject(new Error(error.message));
+                } else {
+                    this.handleTransportCreated(data);
+                    resolve(data);
+                }
+            });
+        });
     }
 
     async createTransport(direction) {
@@ -208,20 +242,18 @@ class MediaSoupClient {
 
     async handleTransportCreated(data) {
         try {
-            const transport = await this.createTransport(data.direction);
-            
             let mediasoupTransport;
             if (data.direction === 'send') {
-                mediasoupTransport = this.device.createSendTransport(transport);
+                mediasoupTransport = this.device.createSendTransport(data);
                 this.sendTransport = mediasoupTransport;
             } else {
-                mediasoupTransport = this.device.createRecvTransport(transport);
+                mediasoupTransport = this.device.createRecvTransport(data);
                 this.recvTransport = mediasoupTransport;
             }
 
             mediasoupTransport.on('connect', ({ dtlsParameters }, callback, errback) => {
                 this.socket.emit('connect-transport', {
-                    transportId: transport.transportId,
+                    transportId: data.transportId,
                     dtlsParameters
                 }, (error) => {
                     if (error) {
@@ -235,7 +267,7 @@ class MediaSoupClient {
             if (data.direction === 'send') {
                 mediasoupTransport.on('produce', ({ kind, rtpParameters }, callback, errback) => {
                     this.socket.emit('produce', {
-                        transportId: transport.transportId,
+                        transportId: data.transportId,
                         kind,
                         rtpParameters
                     }, (error, data) => {
@@ -257,7 +289,8 @@ class MediaSoupClient {
     async startAudio() {
         try {
             if (!this.sendTransport) {
-                await this.createTransport('send');
+                this.log('Transport de envio não disponível', 'error');
+                return;
             }
 
             const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
@@ -302,7 +335,8 @@ class MediaSoupClient {
     async startVideo() {
         try {
             if (!this.sendTransport) {
-                await this.createTransport('send');
+                this.log('Transport de envio não disponível', 'error');
+                return;
             }
 
             const stream = await navigator.mediaDevices.getUserMedia({ video: true });
@@ -357,7 +391,8 @@ class MediaSoupClient {
     async handleNewProducer(data) {
         try {
             if (!this.recvTransport) {
-                await this.createTransport('recv');
+                this.log('Transport de recepção não disponível', 'error');
+                return;
             }
 
             this.socket.emit('consume', {
