@@ -194,8 +194,13 @@ class MediaSoupClient {
             this.log('Device carregado com sucesso', 'success');
             
             // Criar transports automaticamente após carregar o device
+            this.log('Criando transport de envio...', 'info');
             await this.createSendTransport();
+            this.log('Transport de envio criado', 'success');
+            
+            this.log('Criando transport de recepção...', 'info');
             await this.createRecvTransport();
+            this.log('Transport de recepção criado', 'success');
             
         } catch (error) {
             this.log(`Erro ao carregar device: ${error.message}`, 'error');
@@ -204,10 +209,16 @@ class MediaSoupClient {
 
     async createSendTransport() {
         return new Promise((resolve, reject) => {
-            this.socket.emit('create-transport', { direction: 'send' }, (error, data) => {
-                if (error) {
-                    reject(new Error(error.message));
-                } else {
+            this.socket.emit('create-transport', { direction: 'send' });
+            
+            // Aguardar resposta via evento
+            const timeout = setTimeout(() => {
+                reject(new Error('Timeout creating send transport'));
+            }, 5000);
+            
+            this.socket.once('transport-created', (data) => {
+                if (data.direction === 'send') {
+                    clearTimeout(timeout);
                     this.handleTransportCreated(data);
                     resolve(data);
                 }
@@ -217,10 +228,16 @@ class MediaSoupClient {
 
     async createRecvTransport() {
         return new Promise((resolve, reject) => {
-            this.socket.emit('create-transport', { direction: 'recv' }, (error, data) => {
-                if (error) {
-                    reject(new Error(error.message));
-                } else {
+            this.socket.emit('create-transport', { direction: 'recv' });
+            
+            // Aguardar resposta via evento
+            const timeout = setTimeout(() => {
+                reject(new Error('Timeout creating recv transport'));
+            }, 5000);
+            
+            this.socket.once('transport-created', (data) => {
+                if (data.direction === 'recv') {
+                    clearTimeout(timeout);
                     this.handleTransportCreated(data);
                     resolve(data);
                 }
@@ -242,23 +259,30 @@ class MediaSoupClient {
 
     async handleTransportCreated(data) {
         try {
+            this.log(`Configurando transport ${data.direction}...`, 'info');
+            
             let mediasoupTransport;
             if (data.direction === 'send') {
                 mediasoupTransport = this.device.createSendTransport(data);
                 this.sendTransport = mediasoupTransport;
+                this.log('Send transport configurado', 'success');
             } else {
                 mediasoupTransport = this.device.createRecvTransport(data);
                 this.recvTransport = mediasoupTransport;
+                this.log('Recv transport configurado', 'success');
             }
 
             mediasoupTransport.on('connect', ({ dtlsParameters }, callback, errback) => {
+                this.log(`Conectando transport ${data.direction}...`, 'info');
                 this.socket.emit('connect-transport', {
                     transportId: data.transportId,
                     dtlsParameters
-                }, (error) => {
-                    if (error) {
-                        errback(error);
-                    } else {
+                });
+                
+                // Aguardar confirmação via evento
+                this.socket.once('transport-connected', (response) => {
+                    if (response.transportId === data.transportId) {
+                        this.log(`Transport ${data.direction} conectado`, 'success');
                         callback();
                     }
                 });
@@ -266,21 +290,24 @@ class MediaSoupClient {
 
             if (data.direction === 'send') {
                 mediasoupTransport.on('produce', ({ kind, rtpParameters }, callback, errback) => {
+                    this.log(`Produzindo ${kind}...`, 'info');
                     this.socket.emit('produce', {
                         transportId: data.transportId,
                         kind,
                         rtpParameters
-                    }, (error, data) => {
-                        if (error) {
-                            errback(error);
-                        } else {
-                            callback({ id: data.producerId });
+                    });
+                    
+                    // Aguardar confirmação via evento
+                    this.socket.once('produced', (response) => {
+                        if (response.kind === kind) {
+                            this.log(`${kind} produzido com sucesso`, 'success');
+                            callback({ id: response.producerId });
                         }
                     });
                 });
             }
 
-            this.log(`Transport ${data.direction} configurado`, 'success');
+            this.log(`Transport ${data.direction} configurado completamente`, 'success');
         } catch (error) {
             this.log(`Erro ao configurar transport: ${error.message}`, 'error');
         }
