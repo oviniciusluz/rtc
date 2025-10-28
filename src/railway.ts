@@ -19,9 +19,17 @@ export const railwayConfig = {
 
 export function getRailwayPublicIp(): string | undefined {
   if (railwayConfig.isRailway && railwayConfig.publicUrl) {
-    // Extract IP from Railway URL if possible
-    const url = new URL(railwayConfig.publicUrl);
-    return url.hostname;
+    try {
+      const urlString = railwayConfig.publicUrl.startsWith('http') 
+        ? railwayConfig.publicUrl 
+        : `https://${railwayConfig.publicUrl}`;
+      
+      const url = new URL(urlString);
+      return url.hostname;
+    } catch (error) {
+      console.warn('Failed to parse Railway URL:', railwayConfig.publicUrl);
+      return undefined;
+    }
   }
   return undefined;
 }
