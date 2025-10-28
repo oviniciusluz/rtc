@@ -68,27 +68,80 @@
 
     <!-- Scripts -->
     <script src="/socket.io/socket.io.js"></script>
-    <script src="https://unpkg.com/mediasoup-client@3.6.8/lib/mediasoup-client.min.js"></script>
+    
+    <!-- MediaSoup Client com múltiplos fallbacks -->
     <script>
-        // Verificar se MediaSoup Client foi carregado
-        window.addEventListener('load', () => {
-            if (typeof mediasoupClient === 'undefined') {
-                console.error('MediaSoup Client não foi carregado!');
-                document.body.innerHTML = `
-                    <div style="padding: 20px; text-align: center; color: red;">
-                        <h2>❌ Erro: MediaSoup Client não carregado</h2>
-                        <p>O MediaSoup Client não foi carregado corretamente.</p>
-                        <p>Verifique sua conexão com a internet ou tente recarregar a página.</p>
-                        <button onclick="location.reload()" style="padding: 10px 20px; margin-top: 10px;">
-                            🔄 Recarregar Página
-                        </button>
-                    </div>
-                `;
-            } else {
-                console.log('✅ MediaSoup Client carregado com sucesso');
+        // Função para carregar MediaSoup Client com fallbacks
+        function loadMediaSoupClient() {
+            const cdnUrls = [
+                'https://unpkg.com/mediasoup-client@3.6.8/lib/mediasoup-client.min.js',
+                'https://cdn.skypack.dev/mediasoup-client@3.6.8',
+                'https://unpkg.com/mediasoup-client@3.6.0/lib/mediasoup-client.min.js',
+                'https://cdn.jsdelivr.net/npm/mediasoup-client@3.6.8/dist/mediasoup-client.min.js'
+            ];
+            
+            let currentIndex = 0;
+            
+            function tryLoadScript(url) {
+                return new Promise((resolve, reject) => {
+                    const script = document.createElement('script');
+                    script.src = url;
+                    script.onload = () => {
+                        console.log(`✅ MediaSoup Client carregado de: ${url}`);
+                        resolve();
+                    };
+                    script.onerror = () => {
+                        console.warn(`❌ Falha ao carregar de: ${url}`);
+                        reject();
+                    };
+                    document.head.appendChild(script);
+                });
             }
-        });
+            
+            function loadNext() {
+                if (currentIndex >= cdnUrls.length) {
+                    // Todos os CDNs falharam
+                    document.body.innerHTML = `
+                        <div style="padding: 20px; text-align: center; color: red;">
+                            <h2>❌ Erro: MediaSoup Client não carregado</h2>
+                            <p>Todos os CDNs falharam ao carregar o MediaSoup Client.</p>
+                            <p>Possíveis soluções:</p>
+                            <ul style="text-align: left; max-width: 500px; margin: 20px auto;">
+                                <li>Verifique sua conexão com a internet</li>
+                                <li>Desative bloqueadores de anúncios</li>
+                                <li>Tente usar uma VPN</li>
+                                <li>Recarregue a página</li>
+                            </ul>
+                            <button onclick="location.reload()" style="padding: 10px 20px; margin-top: 10px;">
+                                🔄 Recarregar Página
+                            </button>
+                        </div>
+                    `;
+                    return;
+                }
+                
+                tryLoadScript(cdnUrls[currentIndex])
+                    .then(() => {
+                        // Sucesso!
+                        if (typeof mediasoupClient === 'undefined') {
+                            console.error('MediaSoup Client carregado mas não está disponível globalmente');
+                            currentIndex++;
+                            loadNext();
+                        }
+                    })
+                    .catch(() => {
+                        currentIndex++;
+                        loadNext();
+                    });
+            }
+            
+            loadNext();
+        }
+        
+        // Carregar quando a página estiver pronta
+        window.addEventListener('load', loadMediaSoupClient);
     </script>
+    
     <script src="app.js"></script>
 </body>
 </html>
