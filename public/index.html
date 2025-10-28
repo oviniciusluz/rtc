@@ -75,9 +75,10 @@
         function loadMediaSoupClient() {
             const cdnUrls = [
                 'https://unpkg.com/mediasoup-client@3.6.8/lib/mediasoup-client.min.js',
-                'https://cdn.skypack.dev/mediasoup-client@3.6.8',
                 'https://unpkg.com/mediasoup-client@3.6.0/lib/mediasoup-client.min.js',
-                'https://cdn.jsdelivr.net/npm/mediasoup-client@3.6.8/dist/mediasoup-client.min.js'
+                'https://unpkg.com/mediasoup-client@3.5.0/lib/mediasoup-client.min.js',
+                'https://cdn.jsdelivr.net/npm/mediasoup-client@3.6.8/lib/mediasoup-client.min.js',
+                './mediasoup-client.js' // Fallback local
             ];
             
             let currentIndex = 0;
@@ -122,12 +123,16 @@
                 
                 tryLoadScript(cdnUrls[currentIndex])
                     .then(() => {
-                        // Sucesso!
-                        if (typeof mediasoupClient === 'undefined') {
-                            console.error('MediaSoup Client carregado mas não está disponível globalmente');
-                            currentIndex++;
-                            loadNext();
-                        }
+                        // Aguardar um pouco para o script carregar completamente
+                        setTimeout(() => {
+                            if (typeof mediasoupClient === 'undefined') {
+                                console.error('MediaSoup Client carregado mas não está disponível globalmente');
+                                currentIndex++;
+                                loadNext();
+                            } else {
+                                console.log('✅ MediaSoup Client disponível globalmente');
+                            }
+                        }, 100);
                     })
                     .catch(() => {
                         currentIndex++;
